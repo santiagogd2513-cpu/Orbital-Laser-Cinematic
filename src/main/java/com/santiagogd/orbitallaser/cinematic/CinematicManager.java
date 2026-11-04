@@ -52,7 +52,6 @@ public final class CinematicManager {
         }
         cameraAnchor.setInvisible(true);
         cameraAnchor.setNoGravity(true);
-        cameraAnchor.setMarker(true);
         cameraAnchor.absMoveTo(startCamera.x, startCamera.y, startCamera.z, startYaw, startPitch);
         mc.level.addFreshEntity(cameraAnchor);
         mc.setCameraEntity(cameraAnchor);
