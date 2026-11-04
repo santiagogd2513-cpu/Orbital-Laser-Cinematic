@@ -1,0 +1,5 @@
+{
+  "itemGroup.orbitallaser": "Láser Orbital",
+  "item.orbitallaser.orbital_marker": "Marcador Orbital",
+  "item.orbitallaser.orbital_marker.desc": "Haz clic para marcar el punto de impacto y activar la cinemática del láser orbital"
+}
