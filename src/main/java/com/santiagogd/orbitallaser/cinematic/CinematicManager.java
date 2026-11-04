@@ -1,9 +1,10 @@
 package com.santiagogd.orbitallaser.cinematic;
 
 import com.santiagogd.orbitallaser.OrbitalLaserMod;
-import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -29,6 +30,8 @@ public final class CinematicManager {
     private static float startYaw, startPitch;
     private static float yaw, pitch, roll;
     private static float fov = 70.0F;
+    private static ArmorStand cameraAnchor;
+    private static Entity previousCameraEntity;
 
     private CinematicManager() {}
 
@@ -39,6 +42,15 @@ public final class CinematicManager {
         target = impactTarget;
         startCamera = mc.gameRenderer.getMainCamera().getPosition();
         cameraPosition = startCamera;
+        previousCameraEntity = mc.getCameraEntity();
+        cameraAnchor = net.minecraft.world.entity.EntityType.ARMOR_STAND.create(mc.level);
+        if (cameraAnchor == null) return;
+        cameraAnchor.setInvisible(true);
+        cameraAnchor.setNoGravity(true);
+        cameraAnchor.setMarker(true);
+        cameraAnchor.absMoveTo(startCamera.x, startCamera.y, startCamera.z, startYaw, startPitch);
+        mc.level.addFreshEntity(cameraAnchor);
+        mc.setCameraEntity(cameraAnchor);
         startYaw = mc.player.getYRot();
         startPitch = mc.player.getXRot();
         yaw = startYaw;
@@ -57,6 +69,16 @@ public final class CinematicManager {
         tick = 0;
         roll = 0.0F;
         Minecraft mc = Minecraft.getInstance();
+        if (cameraAnchor != null) {
+            if (mc.getCameraEntity() == cameraAnchor) {
+                Entity restore = previousCameraEntity != null && previousCameraEntity.isAlive()
+                        ? previousCameraEntity : mc.player;
+                mc.setCameraEntity(restore);
+            }
+            cameraAnchor.discard();
+            cameraAnchor = null;
+        }
+        previousCameraEntity = null;
         mc.options.hideGui = previousHideGui;
         OrbitalLaserMod.LOGGER.info("Orbital cinematic stopped.");
     }
@@ -78,6 +100,7 @@ public final class CinematicManager {
         }
         mc.options.hideGui = true;
         updateShot(tick);
+        syncCameraAnchor();
         spawnAtmosphere(mc);
     }
 
@@ -129,7 +152,15 @@ public final class CinematicManager {
     private static void aimAt(Vec3 point) {
         Vec3 direction = point.subtract(cameraPosition).normalize();
         yaw = (float)(Mth.atan2(direction.z, direction.x) * (180.0 / Math.PI)) - 90.0F;
-        pitch = (float)(-Mth.asin((float)direction.y) * (180.0 / Math.PI));
+        double vertical = Mth.clamp(direction.y, -1.0, 1.0);
+        pitch = (float)(-Math.asin(vertical) * (180.0 / Math.PI));
+    }
+
+    private static void syncCameraAnchor() {
+        if (cameraAnchor == null || !cameraAnchor.isAlive()) return;
+        double eyeHeight = cameraAnchor.getEyeHeight();
+        cameraAnchor.absMoveTo(cameraPosition.x, cameraPosition.y - eyeHeight,
+                cameraPosition.z, yaw, pitch);
     }
 
     private static void spawnAtmosphere(Minecraft mc) {
@@ -160,8 +191,6 @@ public final class CinematicManager {
     @SubscribeEvent
     public static void onComputeCameraAngles(ViewportEvent.ComputeCameraAngles event) {
         if (!playing) return;
-        Camera camera = event.getCamera();
-        camera.setPosition(cameraPosition.x, cameraPosition.y, cameraPosition.z);
         event.setYaw(yaw);
         event.setPitch(pitch);
         event.setRoll(roll);
