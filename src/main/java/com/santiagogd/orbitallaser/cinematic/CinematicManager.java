@@ -43,16 +43,19 @@ public final class CinematicManager {
         startCamera = mc.gameRenderer.getMainCamera().getPosition();
         cameraPosition = startCamera;
         previousCameraEntity = mc.getCameraEntity();
+        startYaw = mc.player.getYRot();
+        startPitch = mc.player.getXRot();
         cameraAnchor = net.minecraft.world.entity.EntityType.ARMOR_STAND.create(mc.level);
-        if (cameraAnchor == null) return;
+        if (cameraAnchor == null) {
+            previousCameraEntity = null;
+            return;
+        }
         cameraAnchor.setInvisible(true);
         cameraAnchor.setNoGravity(true);
         cameraAnchor.setMarker(true);
         cameraAnchor.absMoveTo(startCamera.x, startCamera.y, startCamera.z, startYaw, startPitch);
         mc.level.addFreshEntity(cameraAnchor);
         mc.setCameraEntity(cameraAnchor);
-        startYaw = mc.player.getYRot();
-        startPitch = mc.player.getXRot();
         yaw = startYaw;
         pitch = startPitch;
         roll = 0.0F;
