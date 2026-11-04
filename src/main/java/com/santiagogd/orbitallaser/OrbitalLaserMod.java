@@ -38,6 +38,7 @@ public class OrbitalLaserMod {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
 
         ENTITIES.register(modBus);
+        ModCreativeTabs.CREATIVE_MODE_TABS.register(modBus);  // Own inventory section
 
         modBus.addListener(this::commonSetup);
         modBus.addListener(this::clientSetup);
