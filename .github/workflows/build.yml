@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write   # Needed to create releases
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,10 +31,31 @@ jobs:
       - name: Build with Gradle
         run: gradle build --no-daemon --stacktrace
 
-      - name: Upload built jar
+      - name: Upload built jar (Artifact)
         uses: actions/upload-artifact@v4
         with:
           name: Orbital-Laser-Cinematic
           path: build/libs/*.jar
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Create Release and Upload JAR
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build #${{ github.run_number }}
+          body: |
+            Automatic build of **Orbital Laser Cinematic**
+            
+            - Minecraft: 1.20.1 (Forge)
+            - 3-minute orbital laser cinematic
+            - Camera leaves the planet
+            
+            Download the `.jar` below and put it in your `mods` folder.
+            
+            Command in-game: `/orbitallaser start`
+          files: build/libs/*.jar
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
