@@ -1,8 +1,10 @@
 package com.santiagogd.orbitallaser.cinematic;
 
 import com.santiagogd.orbitallaser.OrbitalLaserMod;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -11,186 +13,165 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 /**
- * High-end 3-minute Orbital Laser Cinematic Manager.
- * Camera leaves the planet, shows satellite charge-up, fires massive beam.
- * Designed for high graphical load machines.
+ * Client-only, deterministic six-phase cinematic.
+ * Camera paths are evaluated from the original state each tick (never accumulated),
+ * so frame rate and phase transitions cannot introduce positional drift.
  */
 @OnlyIn(Dist.CLIENT)
-public class CinematicManager {
+public final class CinematicManager {
+    public static final int TOTAL_DURATION_TICKS = 20 * 60 * 3;
+    private static boolean playing;
+    private static boolean previousHideGui;
+    private static int tick;
+    private static Vec3 target = Vec3.ZERO;
+    private static Vec3 startCamera = Vec3.ZERO;
+    private static Vec3 cameraPosition = Vec3.ZERO;
+    private static float startYaw, startPitch;
+    private static float yaw, pitch, roll;
+    private static float fov = 70.0F;
 
-    public static final int TOTAL_DURATION_TICKS = 20 * 60 * 3; // 3 minutes exactly
-
-    private static boolean isPlaying = false;
-    private static int currentTick = 0;
-    private static Vec3 targetPosition = Vec3.ZERO;
-    private static Vec3 satellitePosition = Vec3.ZERO;
-
-    // Camera state
-    private static Vec3 cameraPos = Vec3.ZERO;
-    private static float cameraYaw = 0;
-    private static float cameraPitch = 0;
-    private static float cameraFov = 70;
+    private CinematicManager() {}
 
     public static void startCinematic(Vec3 impactTarget) {
-        if (isPlaying) return;
-
-        isPlaying = true;
-        currentTick = 0;
-        targetPosition = impactTarget;
-
-        // Position satellite high above the target (in "space")
-        satellitePosition = new Vec3(
-                impactTarget.x,
-                impactTarget.y + 380, // Very high - outside normal world height feel
-                impactTarget.z
-        );
-
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            cameraPos = mc.player.getEyePosition();
-            cameraYaw = mc.player.getYRot();
-            cameraPitch = mc.player.getXRot();
-        }
+        if (mc.player == null || mc.level == null) return;
 
-        OrbitalLaserMod.LOGGER.info("Starting 3-minute Orbital Laser Cinematic. Target: {}", impactTarget);
+        target = impactTarget;
+        startCamera = mc.gameRenderer.getMainCamera().getPosition();
+        cameraPosition = startCamera;
+        startYaw = mc.player.getYRot();
+        startPitch = mc.player.getXRot();
+        yaw = startYaw;
+        pitch = startPitch;
+        roll = 0.0F;
+        fov = 70.0F;
+        tick = 0;
+        previousHideGui = mc.options.hideGui;
+        playing = true;
+        OrbitalLaserMod.LOGGER.info("Orbital cinematic started at {}", target);
     }
 
     public static void stopCinematic() {
-        isPlaying = false;
-        currentTick = 0;
-        Minecraft.getInstance().options.hideGui = false;
+        if (!playing) return;
+        playing = false;
+        tick = 0;
+        roll = 0.0F;
+        Minecraft mc = Minecraft.getInstance();
+        mc.options.hideGui = previousHideGui;
+        OrbitalLaserMod.LOGGER.info("Orbital cinematic stopped.");
     }
 
-    public static boolean isPlaying() {
-        return isPlaying;
-    }
+    public static boolean isPlaying() { return playing; }
+    public static int getCurrentTick() { return tick; }
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || !isPlaying) return;
-
-        currentTick++;
-
-        if (currentTick >= TOTAL_DURATION_TICKS) {
+        if (event.phase != TickEvent.Phase.END || !playing) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null) {
             stopCinematic();
             return;
         }
-
-        updateCameraAndEffects(currentTick);
+        if (++tick >= TOTAL_DURATION_TICKS) {
+            stopCinematic();
+            return;
+        }
+        mc.options.hideGui = true;
+        updateShot(tick);
+        spawnAtmosphere(mc);
     }
 
-    private static void updateCameraAndEffects(int tick) {
-        float progress = tick / (float) TOTAL_DURATION_TICKS;
-
-        // === PHASES OF THE 3-MINUTE CINEMATIC ===
-
-        // Phase 1: 0:00 - 0:25  → Slow rise from player, looking at sky
-        if (tick < 500) {
-            float t = tick / 500f;
-            cameraPos = cameraPos.add(0, easeInOut(t) * 40, 0);
-            cameraPitch = lerp(cameraPitch, -55f, t * 0.05f);
-            cameraFov = lerp(cameraFov, 85f, t * 0.03f);
+    private static void updateShot(int t) {
+        Vec3 satellite = target.add(0.0, 300.0, 0.0);
+        float phase;
+        if (t < 500) {
+            phase = ease(t / 500.0F);
+            cameraPosition = startCamera.lerp(target.add(0, 24 + 24 * phase, 42 - 18 * phase), phase);
+            aimAt(target.add(0, 70, 0));
+            fov = lerp(70, 82, phase);
+            roll = (float)Math.sin(phase * Math.PI) * 1.2F;
+        } else if (t < 1400) {
+            phase = ease((t - 500) / 900.0F);
+            double angle = phase * Math.PI * 1.25;
+            cameraPosition = target.add(Math.cos(angle) * 190, 70 + phase * 210, Math.sin(angle) * 190);
+            aimAt(target.add(0, 110, 0));
+            fov = lerp(82, 68, phase);
+            roll = (float)Math.sin(phase * Math.PI * 2) * 2.0F;
+        } else if (t < 2200) {
+            phase = ease((t - 1400) / 800.0F);
+            cameraPosition = target.add(34 - phase * 16, 285 + phase * 8, 34 - phase * 16);
+            aimAt(satellite);
+            fov = lerp(68, 48, phase);
+            roll = 0;
+        } else if (t < 2700) {
+            phase = (t - 2200) / 500.0F;
+            double orbit = t * 0.018;
+            cameraPosition = satellite.add(Math.cos(orbit) * 28, 12 + Math.sin(t * 0.025) * 3, Math.sin(orbit) * 28);
+            aimAt(satellite);
+            fov = lerp(48, 58, ease(phase));
+            roll = (float)Math.sin(phase * Math.PI) * 0.8F;
+        } else if (t < 3300) {
+            phase = ease((t - 2700) / 600.0F);
+            Vec3 beamTrack = satellite.lerp(target, phase);
+            cameraPosition = beamTrack.add(32, 18, 32);
+            aimAt(beamTrack);
+            fov = lerp(58, 76, phase);
+            roll = 0;
+        } else {
+            phase = ease((t - 3300) / 300.0F);
+            cameraPosition = target.add(32 - 10 * phase, 28 + 8 * phase, 32 - 10 * phase);
+            aimAt(target);
+            fov = lerp(76, 70, phase);
+            roll = (float)Math.sin(phase * Math.PI) * 0.4F;
         }
+    }
 
-        // Phase 2: 0:25 - 1:10  → Camera leaves the planet, goes into space
-        else if (tick < 1400) {
-            float t = (tick - 500) / 900f;
-            double height = easeInOut(t) * 320;
-            cameraPos = new Vec3(
-                    targetPosition.x + Math.sin(t * Math.PI * 0.6) * 60,
-                    targetPosition.y + 60 + height,
-                    targetPosition.z + Math.cos(t * Math.PI * 0.6) * 60
-            );
-            cameraPitch = lerp(cameraPitch, -25f, 0.02f);
-            cameraYaw += 0.08f; // Slow orbit
-            cameraFov = lerp(cameraFov, 65f, 0.02f);
-        }
+    private static void aimAt(Vec3 point) {
+        Vec3 direction = point.subtract(cameraPosition).normalize();
+        yaw = (float)(Mth.atan2(direction.z, direction.x) * (180.0 / Math.PI)) - 90.0F;
+        pitch = (float)(-Mth.asin((float)direction.y) * (180.0 / Math.PI));
+    }
 
-        // Phase 3: 1:10 - 1:50  → Approach satellite, show charge-up
-        else if (tick < 2200) {
-            float t = (tick - 1400) / 800f;
-            cameraPos = lerpVec(cameraPos, satellitePosition.add(18, 8, 18), 0.025f);
-            lookAt(satellitePosition);
-            cameraFov = lerp(cameraFov, 50f, 0.015f);
-
-            // Charge particles / intensity would ramp here
-        }
-
-        // Phase 4: 1:50 - 2:15  → Final charge + fire
-        else if (tick < 2700) {
-            float t = (tick - 2200) / 500f;
-            cameraPos = satellitePosition.add(
-                    Math.cos(tick * 0.04) * 12,
-                    6 + Math.sin(tick * 0.03) * 3,
-                    Math.sin(tick * 0.04) * 12
-            );
-            lookAt(satellitePosition);
-
-            if (tick == 2550) {
-                // FIRE event
-                OrbitalLaserMod.LOGGER.info("ORBITAL LASER FIRED");
+    private static void spawnAtmosphere(Minecraft mc) {
+        if (mc.level == null || tick % 2 != 0) return;
+        Vec3 satellite = target.add(0, 300, 0);
+        float charge = Mth.clamp((tick - 1500) / 900.0F, 0, 1);
+        if (tick >= 1400 && tick < 2700) {
+            for (int i = 0; i < 3; i++) {
+                double a = mc.level.random.nextDouble() * Math.PI * 2;
+                double r = 2.5 + mc.level.random.nextDouble() * (3.0 + charge * 5.0);
+                mc.level.addParticle(ParticleTypes.END_ROD,
+                        satellite.x + Math.cos(a) * r, satellite.y + mc.level.random.nextDouble() * 2,
+                        satellite.z + Math.sin(a) * r, 0, 0.025 + charge * 0.04, 0);
+            }
+            if (tick >= 2200 && tick < 2550 && tick % 8 == 0) {
+                mc.level.addParticle(ParticleTypes.ELECTRIC_SPARK, satellite.x, satellite.y, satellite.z, 0, 0.08, 0);
             }
         }
-
-        // Phase 5: 2:15 - 2:45  → Follow the beam down to the planet
-        else if (tick < 3300) {
-            float t = (tick - 2700) / 600f;
-            Vec3 beamPoint = lerpVec(satellitePosition, targetPosition, easeInOut(t));
-            cameraPos = beamPoint.add(
-                    Math.cos(tick * 0.02) * 25,
-                    15,
-                    Math.sin(tick * 0.02) * 25
-            );
-            lookAt(beamPoint);
-            cameraFov = lerp(cameraFov, 75f, 0.02f);
+        if (tick >= 2550 && tick < 3300 && tick % 5 == 0) {
+            double spread = 1.5 + mc.level.random.nextDouble() * 3.5;
+            mc.level.addParticle(ParticleTypes.SOUL_FIRE_FLAME,
+                    target.x + (mc.level.random.nextDouble() - 0.5) * spread,
+                    target.y + mc.level.random.nextDouble() * 12,
+                    target.z + (mc.level.random.nextDouble() - 0.5) * spread, 0, 0.12, 0);
         }
-
-        // Phase 6: 2:45 - 3:00  → Impact + aftermath, slow return feel
-        else {
-            float t = (tick - 3300) / 300f;
-            cameraPos = lerpVec(cameraPos, targetPosition.add(30, 25, 30), 0.03f);
-            lookAt(targetPosition);
-            cameraFov = lerp(cameraFov, 70f, 0.02f);
-        }
-
-        // Hide GUI during cinematic
-        Minecraft.getInstance().options.hideGui = true;
     }
 
     @SubscribeEvent
     public static void onComputeCameraAngles(ViewportEvent.ComputeCameraAngles event) {
-        if (!isPlaying) return;
-
-        event.setYaw(cameraYaw);
-        event.setPitch(cameraPitch);
-        // Roll can be added for more dramatic effect if wanted
+        if (!playing) return;
+        Camera camera = event.getCamera();
+        camera.setPosition(cameraPosition.x, cameraPosition.y, cameraPosition.z);
+        event.setYaw(yaw);
+        event.setPitch(pitch);
+        event.setRoll(roll);
     }
 
-    // ===== Utility =====
-
-    private static void lookAt(Vec3 target) {
-        Vec3 dir = target.subtract(cameraPos).normalize();
-        cameraYaw = (float) (Math.toDegrees(Math.atan2(dir.z, dir.x)) - 90);
-        cameraPitch = (float) -Math.toDegrees(Math.asin(dir.y));
+    private static float ease(float value) {
+        float t = Mth.clamp(value, 0, 1);
+        return t * t * (3.0F - 2.0F * t);
     }
-
     private static float lerp(float a, float b, float t) {
-        return a + (b - a) * Math.min(1f, t);
-    }
-
-    private static Vec3 lerpVec(Vec3 a, Vec3 b, float t) {
-        return a.add(b.subtract(a).scale(Math.min(1.0, t)));
-    }
-
-    private static float easeInOut(float t) {
-        return t < 0.5f ? 2 * t * t : 1 - (float) Math.pow(-2 * t + 2, 2) / 2;
-    }
-
-    public static Vec3 getCameraPosition() {
-        return cameraPos;
-    }
-
-    public static int getCurrentTick() {
-        return currentTick;
+        return Mth.lerp(Mth.clamp(t, 0, 1), a, b);
     }
 }

@@ -5,23 +5,17 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
 
-public class NetworkHandler {
-
-    private static final String PROTOCOL = "1";
+public final class NetworkHandler {
+    private static final String PROTOCOL = "2";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(OrbitalLaserMod.MOD_ID, "main"),
-            () -> PROTOCOL,
-            PROTOCOL::equals,
-            PROTOCOL::equals
-    );
-
-    private static int id = 0;
-
+            () -> PROTOCOL, PROTOCOL::equals, PROTOCOL::equals);
+    private static int id;
+    private NetworkHandler() {}
     public static void register() {
-        // Packets will be registered here later:
-        // - StartCinematicPacket
-        // - SyncSatelliteStatePacket
-        // - BeamImpactPacket
-        OrbitalLaserMod.LOGGER.info("NetworkHandler registered");
+        CHANNEL.registerMessage(id++, StartCinematicS2CPacket.class,
+                StartCinematicS2CPacket::encode, StartCinematicS2CPacket::decode,
+                StartCinematicS2CPacket::handle);
+        OrbitalLaserMod.LOGGER.info("Orbital cinematic network channel registered.");
     }
 }
