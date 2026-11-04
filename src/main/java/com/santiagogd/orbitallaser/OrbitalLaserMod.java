@@ -3,6 +3,7 @@ package com.santiagogd.orbitallaser;
 import com.mojang.logging.LogUtils;
 import com.santiagogd.orbitallaser.cinematic.CinematicManager;
 import com.santiagogd.orbitallaser.entity.SatelliteEntity;
+import com.santiagogd.orbitallaser.item.ModItems;
 import com.santiagogd.orbitallaser.network.NetworkHandler;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -38,7 +39,8 @@ public class OrbitalLaserMod {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
 
         ENTITIES.register(modBus);
-        ModCreativeTabs.CREATIVE_MODE_TABS.register(modBus);  // Own inventory section
+        ModItems.ITEMS.register(modBus);
+        ModCreativeTabs.CREATIVE_MODE_TABS.register(modBus);
 
         modBus.addListener(this::commonSetup);
         modBus.addListener(this::clientSetup);
