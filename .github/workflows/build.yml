@@ -28,8 +28,8 @@ jobs:
         with:
           gradle-version: '8.8'   # ForgeGradle does not support Gradle 9 yet
 
-      - name: Build with Gradle
-        run: gradle build --no-daemon --stacktrace
+      - name: Full clean verification and build
+        run: gradle clean check build --no-daemon --stacktrace
 
       - name: Upload built jar (Artifact)
         uses: actions/upload-artifact@v4
