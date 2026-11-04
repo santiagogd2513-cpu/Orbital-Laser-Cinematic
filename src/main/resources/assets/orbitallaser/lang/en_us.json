@@ -1,3 +1,5 @@
 {
-  "itemGroup.orbitallaser": "Orbital Laser"
+  "itemGroup.orbitallaser": "Orbital Laser",
+  "item.orbitallaser.orbital_marker": "Orbital Marker",
+  "item.orbitallaser.orbital_marker.desc": "Click to mark the impact point and start the orbital laser cinematic"
 }
