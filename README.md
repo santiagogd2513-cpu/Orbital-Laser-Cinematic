@@ -1,62 +1,21 @@
-# Orbital Laser Cinematic
+# ChunkBoost — Forge 1.20.1
 
-**High-end 3-minute space weapon cinematic system for Minecraft Java (Forge 1.20.1)**
+Mod cliente para Minecraft Java 1.20.1 + Forge 47.4.5.
 
-Designed for high graphical load machines.
+## Funciones iniciales
 
-## What it does
+- Eleva el límite del control de distancia de renderizado de 32 a 128 chunks mediante un mixin de cliente.
+- Activa la prioridad de actualización **NEARBY** de Minecraft para que los chunks cercanos al jugador se reconstruyan antes que los lejanos.
+- GitHub Actions compila automáticamente al hacer push a esta rama o a `main`, y publica el JAR como artefacto descargable durante 30 días.
 
-When activated, the camera leaves the planet in a long cinematic sequence:
+## Importante sobre 128 chunks
 
-| Time       | Phase                                      |
-|------------|--------------------------------------------|
-| 0:00-0:25  | Slow rise from the player, looking at sky  |
-| 0:25-1:10  | Camera leaves the planet into "space"      |
-| 1:10-1:50  | Approach the satellite, show charge-up     |
-| 1:50-2:15  | Final charge + FIRE                        |
-| 2:15-2:45  | Follow the massive beam down to the surface|
-| 2:45-3:00  | Impact + aftermath                         |
+128 es el máximo que permite seleccionar el mod, no una garantía de que cualquier equipo pueda renderizar esa distancia. El consumo de RAM/VRAM y el tiempo de generación de chunks crecen mucho; el servidor también puede limitar la distancia de visualización. Se recomienda empezar con valores bajos y subir gradualmente.
 
-Total duration: **exactly 3 minutes** (3600 ticks).
+La prioridad NEARBY mejora el orden en que se atienden las actualizaciones visibles; no elimina los límites de CPU, GPU, almacenamiento, red ni generación del mundo. No se promete un multiplicador fijo de velocidad.
 
-## How to test
+## Compilar
 
-1. Build the mod with `./gradlew build`
-2. Put the jar in your mods folder
-3. In-game run:
+En **Actions**, abre la ejecución y descarga el artefacto **ChunkBoost-Forge-1.20.1**.
 
-```
-/orbitallaser start
-```
-
-To stop early:
-
-```
-/orbitallaser stop
-```
-
-## Current status
-
-- ✅ Full 3-minute timeline with 6 cinematic phases
-- ✅ Camera that leaves the planet
-- ✅ Satellite entity with charge & firing state
-- ✅ Command system
-- ⏳ Beam renderer (next)
-- ⏳ High-quality particles & energy effects
-- ⏳ Sound design
-- ⏳ Multiplayer sync packets
-
-## Next steps
-
-I can continue adding:
-- Custom beam renderer (thick energy beam with core + glow + distortion)
-- Particle systems for charge-up and impact
-- Screen shake and post-processing feel
-- Satellite model / renderer
-- Better camera paths (more cinematic curves)
-
-Just tell me what you want next and I keep building on this repo.
-
----
-
-Created for a high-end machine. The cinematic is intentionally heavy on camera movement and duration.
+Requisitos: Java 17, Minecraft Java 1.20.1 y Forge 47.4.5.
