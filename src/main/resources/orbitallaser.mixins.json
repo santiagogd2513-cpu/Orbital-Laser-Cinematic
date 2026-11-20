@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.santiagogd.orbitallaser.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "orbitallaser.refmap.json",
+  "client": ["OptionsMixin"],
+  "injectors": {"defaultRequire": 1}
+}
