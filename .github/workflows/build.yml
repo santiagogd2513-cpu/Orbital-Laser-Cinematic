@@ -1,61 +1,37 @@
-name: Build Mod
+name: Build ChunkBoost Mod
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - 'chatgpt/**'
   workflow_dispatch:
 
 permissions:
-  contents: write   # Needed to create releases
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
+          distribution: temurin
           java-version: '17'
-          distribution: 'temurin'
-          cache: 'gradle'
-
-      - name: Setup Gradle
+          cache: gradle
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.8'   # ForgeGradle does not support Gradle 9 yet
-
-      - name: Full clean verification and build
+          gradle-version: '8.8'
+      - name: Build and verify
         run: gradle clean check build --no-daemon --stacktrace
-
-      - name: Upload built jar (Artifact)
+      - name: Upload mod JAR
         uses: actions/upload-artifact@v4
         with:
-          name: Orbital-Laser-Cinematic
+          name: ChunkBoost-Forge-1.20.1
           path: build/libs/*.jar
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Create Release and Upload JAR
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: Build #${{ github.run_number }}
-          body: |
-            Automatic build of **Orbital Laser Cinematic**
-            
-            - Minecraft: 1.20.1 (Forge)
-            - 3-minute orbital laser cinematic
-            - Camera leaves the planet
-            
-            Download the `.jar` below and put it in your `mods` folder.
-            
-            Command in-game: `/orbitallaser start`
-          files: build/libs/*.jar
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          if-no-files-found: error
+          retention-days: 30
